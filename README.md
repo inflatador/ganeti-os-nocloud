@@ -11,7 +11,7 @@ To that end, the provider:
 
 ### Preparation
 
-Clone the repo on your Ganeti host and copy the contents of the "os" directory into the Ganeti OS directory (which is /usr/share/ganeti/os if you installed via the Debian package).
+Clone the repo on your Ganeti host and copy the contents of the "os" directory into the Ganeti OS directory (which is ``/usr/share/ganeti/os` if you installed via the Debian package).
 
 Obtain [cloud-init images][openstack-obtain-images] for your guest Operating
 System.  The image is expected to be in qcow2 format, but other
@@ -40,24 +40,14 @@ Once the needed image is in place, the VM can be created by specifying
 `/etc/ganeti/instance-nocloud/variants.list`:
 
 ```
-gnt-instance add -o nocloud+${variant} -H cdrom_disk_type=ide,cdrom_image_path=${IMAGE_PATH}/data.iso,boot_order=disk vm.example.com
-
+gnt-instance add -o nocloud+${variant} \
+-H cdrom_disk_type=ide,cdrom_image_path=${IMAGE_PATH}/data.iso,boot_order=disk \
+vm.example.com
 ```
 The `cdrom_disk_type=ide` config is necessary, because Ganeti will attempt to boot off the ISO file if you don't explicitly set this.
 
 ### Known Issues/Caveats
 
-This has only been tested on a single-node Ganeti cluster, and only with file-based storage. I plan on testing further as time permits, but it would be very much appreciated if you tested the code with other configurations.
+**This has only been tested on a single-node Ganeti cluster, and only with file-based storage.** I plan on testing further as time permits, but it would be very much appreciated if you tested the code with other configurations.
 
 Support for the vfat filesystem approach described in [the cloud-init documentation](https://cloudinit.readthedocs.io/en/latest/reference/datasources/nocloud.html#example-creating-a-disk) is planned.
-
-
-[Ganeti]: http://www.ganeti.org/
-[cloud-init]: https://cloudinit.readthedocs.io/en/latest/
-[NoCloud]: https://cloudinit.readthedocs.io/en/latest/topics/datasources/nocloud.html
-[cloud-config]: https://cloudinit.readthedocs.io/en/latest/topics/format.html#cloud-config-data
-[cloud-config-examples]: https://cloudinit.readthedocs.io/en/latest/topics/examples.html#yaml-examples
-[cloud-init-merge]: https://cloudinit.readthedocs.io/en/latest/topics/merging.html
-[openstack-obtain-images]: https://docs.openstack.org/image-guide/obtain-images.html
-[instance-simpleimage]: https://github.com/ganeti/instance-simpleimage
-[instance-cloudimage]: https://github.com/ganeti/instance-cloudimage
