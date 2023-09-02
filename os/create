@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 #! /bin/bash
 # Copyright (C) 2019  Petter A. Urkedal <urkedal@ndgf.org>
 #
@@ -14,10 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-set -e
+set -euo pipefail
 
 . common.sh
-
 
 # Mount root FS
 
@@ -25,180 +25,12 @@ targetdev="$DISK_0_PATH"
 
 qemu-img convert -f "$IMAGE_FORMAT" -O raw "$IMAGE_DIR/$IMAGE_FILE" "$targetdev"
 
-rootmnt="`mktemp -d /tmp/ganeti-os-nocloud-root.XXXXXX`"
-atexit "rmdir $rootmnt"
-
-rootdev=`map_disk0 $targetdev`
-atexit "unmap_disk0 $targetdev"
-mount -o nosuid,nodev,noexec "$rootdev" "$rootmnt"
-atexit "umount $rootmnt"
-
-mkdir -p "${rootmnt}${CLOUD_SEED_DIR}"
-
-
-# Generate user-data
-
-compose_userdata()
-{
-    local parts part_spec payload
-    parse_list_parameter parts "${OSP_CLOUD_USERDATA}"
-    echo '#include'
-    for index in `seq ${#parts[@]}`; do
-	part_spec="${parts[index-1]}"
-	part_file="${CLOUD_SEED_DIR}/user-data-${index}"
-	payload="${part_spec#*:}"
-	case "${part_spec%%:*}" in
-	    file)
-		echo "${part_file}"
-		( cd /etc/ganeti/nocloud/user-data;
-		  install -m600 "${payload}" "${rootmnt}${part_file}" )
-		;;
-	    script)
-		echo "${part_file}"
-		( PATH="/etc/ganeti/nocloud/user-data:$PATH";
-		  "${payload}" > "${rootmnt}${part_file}" )
-		;;
-	    base64)
-		echo "${part_file}"
-		echo -n "${payload}" | base64 -d > "${rootmnt}${part_file}"
-		;;
-	    http|https|ftp|sftp|tftp|scp)
-		echo "${payload}"
-		;;
-	    *)
-		echo 1>&2 "Unknown URL scheme ${part_spec%%:*}"
-		exit 2
-		;;
-	esac
-    done
-}
-
-umask 077
-if [ -n "${OSP_CLOUD_USERDATA}" ]; then
-    compose_userdata > "${rootmnt}${CLOUD_SEED_DIR}/user-data"
-else
-    for file in "${OS_VARIANT}.yml" "default.yml"; do
-	userdata="/etc/ganeti/nocloud/user-data/${file}"
-	if [ -e "${userdata}" ]; then
-	    install -m600 "${userdata}" "${rootmnt}${CLOUD_SEED_DIR}/user-data"
-	    break
-	fi
-    done
-fi
-
-# Generate meta-data and network-config
-
-instance_id=$(uuidgen -r)
-
-cat >"${rootmnt}${CLOUD_SEED_DIR}/meta-data" <<EOF
-instance-id: ${instance_id}
-preserve_hostname: false
-local-hostname: ${INSTANCE_NAME}
-fqdn: ${INSTANCE_NAME}
-EOF
-
-have_some_nic_ip()
-{
-    for i in $(seq 0 $(expr $NIC_COUNT - 1)); do
-	nic_ip=$(eval echo \$NIC_${i}_IP)
-	[ -z "$nic_ip" ] || return 0
-    done
-    return 1
-}
-
-lookup_ipv4()
-{
-    host -t A $1 | sed 's/.* address //' | grep -E '^[0-9.]+$'
-}
-lookup_ipv6()
-{
-    host -t AAAA $1 | sed 's/.* address //' | grep -E '^[0-9a-f:]+$'
-}
-
-generate_network_config()
-{
-    local address i ip ipv4_prefixlen ipv6_prefixlen prefixlen
-    local dns_nameservers dns_search
-    echo "version: 2"
-    echo "ethernets:"
-    for i in $(seq 0 $(expr $NIC_COUNT - 1)); do
-	nic_ip=$(eval echo \$NIC_${i}_IP)
-	[ -n "$nic_ip" -o $i = ${OSP_STATIC_HOST_INTERFACE:--1} ] || continue
-	nic_mac=$(eval echo \$NIC_${i}_MAC)
-	nic_network_subnet4=$(eval echo \$NIC_${i}_NETWORK_SUBNET)
-	nic_network_subnet6=$(eval echo \$NIC_${i}_NETWORK_SUBNET6)
-	nic_gateway4=$(eval echo \$NIC_${i}_NETWORK_GATEWAY)
-	nic_gateway6=$(eval echo \$NIC_${i}_NETWORK_GATEWAY6)
-	nic_name=$(eval echo \$NIC_${i}_NAME)
-	nic_name_is_provided=true
-	if [ -z "$nic_name"]; then
-	    nic_name="eth${i}"
-	    nic_name_is_provided=false
-	fi
-	echo             "  ${nic_name}:"
-	if [ -n "$nic_mac" ]; then
-	    echo         "    match: {macaddress: '$nic_mac'}"
-	    if $nic_name_is_provided; then
-		echo         "    set-name: '$nic_name'"
-	    fi
-	else
-	    echo         "    match: {name: '$nic_name'}"
-	fi
-	if [ -z "$nic_network_subnet4" ]; then
-	    ipv4_prefixlen=24
-	else
-	    ipv4_prefixlen="${nic_network_subnet4#*/}"
-	fi
-	if [ -z "$nic_network_subnet6" ]; then
-	    ipv6_prefixlen=64
-	else
-	    ipv6_prefixlen="${nic_network_subnet6#*/}"
-	fi
-	echo             "    addresses:"
-	case "$nic_ip" in
-	    *.*.*.*)
-		echo     "      - '${nic_ip}/${ipv4_prefixlen}'"
-		;;
-	    *:*)
-		echo     "      - '${nic_ip}/${ipv6_prefixlen}'"
-		;;
-	esac
-	if [ $i = ${OSP_STATIC_HOST_INTERFACE:--1} ]; then
-	    for ip in $(lookup_ipv4 $INSTANCE_NAME); do
-		if [ "$ip" != "$nic_ip" ]; then
-		    echo "      - '${ip}/${ipv4_prefixlen}'"
-		fi
-	    done
-	    for ip in $(lookup_ipv6 $INSTANCE_NAME); do
-		if [ "$ip" != "$nic_ip" ]; then
-		    echo "      - '${ip}/${ipv6_prefixlen}'"
-		fi
-	    done
-	fi
-	if [ -n "$nic_gateway4" ]; then
-	    echo         "    gateway4: '${nic_gateway4}'"
-	fi
-	if [ -n "$nic_gateway6" ]; then
-	    echo         "    gateway6: '${nic_gateway6}'"
-	    echo         "    accept-ra: false"
-	fi
-	if [ -n "$OSP_DNS_NAMESERVERS" ]; then
-	    echo         "    nameservers:"
-	    echo         "        addresses:"
-	    parse_list_parameter dns_nameservers "$OSP_DNS_NAMESERVERS"
-	    for address in "${dns_nameservers[@]}"; do
-		echo     "          - '${address}'"
-	    done
-	    if [ -n "${OSP_DNS_SEARCH}" ]; then
-		echo     "        search:"
-		parse_list_parameter dns_search "$OSP_DNS_SEARCH"
-		for address in "${dns_search[@]}"; do
-		    echo "          - '${address}'"
-		done
-	    fi
-	fi
-    done
-}
-if have_some_nic_ip || [ -n "$OSP_STATIC_HOST_INTERFACE" ]; then
-    generate_network_config >"${rootmnt}${CLOUD_SEED_DIR}/network-config"
-fi
+# rootmnt="`mktemp -d /tmp/ganeti-os-nocloud-root.XXXXXX`"
+# atexit "rmdir $rootmnt"
+#
+# rootdev=`map_disk0 $targetdev`
+# atexit "unmap_disk0 $targetdev"
+# mount -o nosuid,nodev,noexec "$rootdev" "$rootmnt"
+# atexit "umount $rootmnt"
+#
+# mkdir -p "${rootmnt}${CLOUD_SEED_DIR}"

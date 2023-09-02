@@ -1,5 +1,10 @@
 ## Synopsis
-This is a fork of [neicnordic's ganeti-os-nocloud ](https://github.com/neicnordic/ganeti-os-nocloud) . It strives to follow the implementation of the original as well as the guidelines listed in [instance-cloudimage][],  with a few important exceptions:
+This is a fork of [neicnordic's ganeti-os-nocloud ](https://github.com/neicnordic/ganeti-os-nocloud)
+
+### Design differences
+This provider seeks to create a "cloud-style" provisioning experience, relying on cloud-init as much as possible and avoiding Ganeti-specific features.
+
+To that end, the provider:
 
 * **Uses cloud-init [NoCloud data source Method 1](https://cloudinit.readthedocs.io/en/latest/reference/datasources/nocloud.html#method-1-local-filesystem-labeled-filesystem) exclusively.** There are no attempts to mount/inject data into the filesystem.
 * **Does not handle NoCloud data source creation.** The create script accepts a path to the NoCloud data source, but it doesn't set up or validate the NoCloud data source in any way.
