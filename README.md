@@ -37,7 +37,7 @@ Create a NoCloud data source using [one of the methods described in the cloud-in
 
 Once the needed image is in place, the VM can be created by specifying
 `nocloud+variant` as the OS, where `variant` is one of
-`/etc/ganeti/instance-nocloud/variants.list`:
+`/etc/ganeti/instance-nocloud/variants.list` and `data.iso` is the NoCloud datasource:
 
 ```
 gnt-instance add -o nocloud+${variant} \
