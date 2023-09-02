@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2019  Petter A. Urkedal <urkedal@ndgf.org>
 #
 # This program is free software: you can redistribute it and/or modify
@@ -15,7 +16,6 @@
 
 IMAGE_DIR="/var/cache/ganeti-cloudimg"
 IMAGE_FORMAT="qcow2"
-CLOUD_SEED_DIR="/var/lib/cloud/seed/nocloud"
 
 if [ -r "/etc/ganeti/nocloud/variants/${OS_VARIANT}.conf" ]; then
     . "/etc/ganeti/nocloud/variants/${OS_VARIANT}.conf"
