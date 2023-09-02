@@ -18,6 +18,6 @@ IMAGE_DIR="/var/cache/ganeti-cloudimg"
 IMAGE_FORMAT="qcow2"
 
 if [ -r "/etc/ganeti/instance-nocloud/variants/${OS_VARIANT}.conf" ]; then
+    logger "Sourcing variables from /etc/ganeti/instance-nocloud/variants/${OS_VARIANT}.conf"
     . "/etc/ganeti/instance-nocloud/variants/${OS_VARIANT}.conf"
 fi
-printf "%s\n" "${IMAGE_FILE}"
