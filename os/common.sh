@@ -17,67 +17,7 @@
 IMAGE_DIR="/var/cache/ganeti-cloudimg"
 IMAGE_FORMAT="qcow2"
 
-if [ -r "/etc/ganeti/nocloud/variants/${OS_VARIANT}.conf" ]; then
-    . "/etc/ganeti/nocloud/variants/${OS_VARIANT}.conf"
+if [ -r "/etc/ganeti/instance-nocloud/variants/${OS_VARIANT}.conf" ]; then
+    . "/etc/ganeti/instance-nocloud/variants/${OS_VARIANT}.conf"
 fi
-
-die()
-{
-    echo 1>&2 "$*"
-    exit 1
-}
-
-_atexit_jobs=( )
-
-_atexit_run()
-{
-    if [ ${#_atexit_jobs[*]} -gt 0 ]; then
-	for i in $(seq $((${#_atexit_jobs[*]} - 1)) -1 0); do
-	    ${_atexit_jobs[$i]}
-	done
-    fi
-}
-
-trap _atexit_run EXIT
-
-atexit()
-{
-    [ $# = 1 ] || die "Usage: atexit COMMAND"
-    _atexit_jobs+=("$1")
-}
-
-parse_list_parameter()
-{
-    local IFS=,
-    local local__q local__qs local__x
-    local__qs="${2//%/%45}"
-    local__qs="${local__qs//\\\\/%5c}"
-    local__qs="${local__qs//\\,/%54}"
-    eval "$1=( )"
-    for local__q in $local__qs; do
-	local__x="${local__q//%54/,}"
-	local__x="${local__x//%5c/\\}"
-	local__x="${local__x//%45/%}"
-	eval $1+='("$local__x")'
-    done
-}
-
-# Adapted from ganeti-instance-debootstrap.
-map_disk0() {
-  blockdev="$1"
-  filesystem_dev_base=`kpartx -l $blockdev | \
-		       grep -m 1 -- "p1 :[0-9 ]* $blockdev " | \
-		       awk '{print $1}'`
-  if [ -z "$filesystem_dev_base" ]; then
-    die "Cannot interpret kpartx output and get partition mapping"
-  fi
-  kpartx -a -s $blockdev > /dev/null
-  filesystem_dev="/dev/mapper/$filesystem_dev_base"
-  if [ ! -b "$filesystem_dev" ]; then
-    die "Can't find kpartx mapped partition: $filesystem_dev"
-  fi
-  echo "$filesystem_dev"
-}
-unmap_disk0() {
-  kpartx -d "$1"
-}
+printf "%s\n" "${IMAGE_FILE}"
